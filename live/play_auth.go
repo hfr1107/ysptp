@@ -2,10 +2,8 @@ package live
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/json"
 	"io"
-	"math/big"
 	"net/http"
 	"strings"
 )
@@ -168,14 +166,16 @@ func CheckPlayAuth() bool {
 }
 
 func GetBaseM3uUrl(liveID string) string {
-	// 使用 crypto/rand 生成一个范围内的随机数
-	max := big.NewInt(int64(len(DeviceModel))) // 设置最大范围为 len(DeviceModele)
-	randomIndex, _ := rand.Int(rand.Reader, max)
+	LogDebug("LiveID ", liveID)
+	// // 使用 crypto/rand 生成一个范围内的随机数
+	// max := big.NewInt(int64(len(DeviceModel))) // 设置最大范围为 len(DeviceModele)
+	// randomIndex, _ := rand.Int(rand.Reader, max)
 	// 构造 JSON 数据
 	requestBody := map[string]interface{}{
 		"rate":       "",
 		"systemType": "android",
-		"model":      DeviceModel[randomIndex.Int64()],
+		//"model":      DeviceModel[randomIndex.Int64()],
+		"model":      "",
 		"id":         liveID,
 		"userId":     "",
 		"clientSign": "cctvVideo",

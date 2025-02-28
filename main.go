@@ -52,6 +52,7 @@ func setupRouter() *gin.Engine {
 }
 
 func main() {
+
 	host := flag.String("host", "0.0.0.0", "host")
 	port := flag.String("p", "16384", "port")
 	flag.BoolVar(&live.DebugMode, "debug", false, "是否开启调试模式")
@@ -60,15 +61,42 @@ func main() {
 	// live.Host = *host
 	// live.Port = *port
 
+	// live.GetBaseM3uUrl("Live1717729995180256")
+	// live.GetBaseM3uUrl("Live1718261577870260")
+	// live.GetBaseM3uUrl("Live1718261955077261")
+	// live.GetBaseM3uUrl("Live1718276148119264")
+	// live.GetBaseM3uUrl("Live1719474204987287")
+	// live.GetBaseM3uUrl("Live1719473996025286")
+	// live.GetBaseM3uUrl("Live1718276412224269")
+	// live.GetBaseM3uUrl("Live1718276458899270")
+	// live.GetBaseM3uUrl("Live1718276503187272")
+	// live.GetBaseM3uUrl("Live1718276550002273")
+	// live.GetBaseM3uUrl("Live1718276603690275")
+	// live.GetBaseM3uUrl("Live1718276623932276")
+	// live.GetBaseM3uUrl("Live1718276575708274")
+	// live.GetBaseM3uUrl("Live1718276498748271")
+	// live.GetBaseM3uUrl("Live1718276319614267")
+	// live.GetBaseM3uUrl("Live1718276256572265")
+	// live.GetBaseM3uUrl("Live1718276138318263")
+	// live.GetBaseM3uUrl("Live1719392219423280")
+	// live.GetBaseM3uUrl("Live1719392670442283")
+	// live.GetBaseM3uUrl("Live1719392779653284")
+	// live.GetBaseM3uUrl("Live1719392885692285")
+	// live.GetBaseM3uUrl("Live1719392560433282")
+	// live.GetBaseM3uUrl("Live1719392360336281")
+	// live.GetBaseM3uUrl("Live1704966749996185")
+	// live.GetBaseM3uUrl("Live1704872878572161")
+	// live.GetBaseM3uUrl("Live1688400593818102")
+
 	live.GetUIDStatus()
 	live.GetGUID()
 	live.CheckPlayAuth()
 	live.GetAppSecret()
 	live.SetCache("check", "", "", "", "")
 
-	live.LogInfo("开始初始化缓存")
-	live.RefreshM3u8Cache()
-	live.LogInfo("初始化缓存完成")
+	// live.LogInfo("开始初始化缓存")
+	// live.RefreshM3u8Cache()
+	// live.LogInfo("初始化缓存完成")
 
 	// 创建一个通道用于停止定时任务
 	done := make(chan bool)
@@ -89,7 +117,7 @@ func main() {
 // 定时执行的函数
 func timedFunction(done <-chan bool) {
 	// 创建一个定时器，每隔 ? 秒触发一次
-	ticker := time.NewTicker(1699 * time.Second)
+	ticker := time.NewTicker(1600 * time.Second)
 	defer ticker.Stop() // 确保结束时释放资源
 
 	for {

@@ -314,7 +314,7 @@ func GetCache(key string) (string, string, string, string, bool) {
 func SetCache(key, playUrl, appRandomStr, appSign, urlPath string) {
 	m3uCache.Store(key, M3uCacheItem{
 		playUrl:      playUrl,
-		Expiration:   time.Now().Unix() + 1700,
+		Expiration:   time.Now().Unix() + 2000,
 		appRandomStr: appRandomStr,
 		appSign:      appSign,
 		urlPath:      urlPath,
@@ -336,6 +336,8 @@ func RefreshM3u8Cache() {
 		baseM3u8Url := GetBaseM3uUrl(liveID)
 		if baseM3u8Url == "" {
 			LogError("获取base m3u8地址失败")
+			LogError("可能触发风控，停止缓存")
+			break
 			//return "", ""
 			//panic("获取base m3u8地址失败")
 		}
@@ -387,6 +389,7 @@ func RefreshM3u8Cache() {
 
 		// 将结果缓存起来
 		SetCache(cacheKey, playURL, appRandomStr, appSign, urlPath)
+		time.Sleep(10 * time.Second)
 	}
 	LogInfo("缓存刷新完成")
 
