@@ -9,9 +9,16 @@ import (
 // var Port string = "16384"
 var DebugMode = false
 
-var UID = ""
-var GUID = ""
-var UIDInit = false
+var UIDCount = 3
+
+type UIDData struct {
+	UID     string
+	UIDInit bool
+	GUID    string
+}
+
+var UIDsData []UIDData
+
 var AppSecret = "e7e259bbb0ac4848ba70921c860a1216"
 
 const AppId = "5f39826474a524f95d5f436eacfacfb67457c4a7"

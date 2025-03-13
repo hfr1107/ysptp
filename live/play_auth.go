@@ -8,33 +8,60 @@ import (
 	"strings"
 )
 
-func GetUIDStatus() (string, bool) {
-	dataJson := ReadJsonFile("./data.json")
-	if dataJson == (Data{}) {
-		LogInfo("data.json 为空，重新生成")
-		newUID := GenerateAndroidID()
+func GetUIDs() {
+	dataJson, succeed := ReadJsonFile("./data.json")
+	var i int
+	if succeed && len(dataJson.UIDs) == 8 {
+		uids := dataJson.UIDs
+		for i = 0; i < UIDCount; i++ {
+			UIDsData = append(UIDsData, UIDData{
+				UID:     uids[i],
+				UIDInit: dataJson.Init,
+				GUID:    "",
+			})
+		}
+		LogInfo("UIDs 读取结果 ", uids)
+	} else {
 		var newDataJson Data
-		newDataJson.UID = newUID
+		var newUIDs []string
+
+		for i = 0; i < 8; i++ {
+			newUID := GenerateAndroidID()
+			newUIDs = append(newUIDs, newUID)
+			if i < UIDCount {
+				UIDsData = append(UIDsData, UIDData{
+					UID:     newUID,
+					UIDInit: false,
+					GUID:    "",
+				})
+			}
+		}
+		newDataJson.UIDs = newUIDs
 		newDataJson.Init = false
 		WriteJsonFile(newDataJson, "./data.json")
-		UID = newUID
-		return newUID, false
-	} else {
-		UID = dataJson.UID
-		UIDInit = dataJson.Init
-		LogInfo("UID 读取成功：", UID)
-		LogInfo("Init 读取成功：", UIDInit)
-		return UID, UIDInit
+		LogInfo("UIDs 新建结果 ", newUIDs)
 	}
+
+}
+func GetGUIDs() {
+	if UIDsData == nil {
+		LogInfo("UID 为空，重新获取")
+		GetUIDs()
+	}
+	var i int
+	for i = 0; i < UIDCount; i++ {
+		GetGUID(i)
+	}
+	dataJson, _ := ReadJsonFile("./data.json")
+	var newDataJson Data
+	newDataJson.UIDs = dataJson.UIDs
+	newDataJson.Init = true
+	WriteJsonFile(newDataJson, "./data.json")
 }
 
-func GetGUID() error {
-	if UID == "" {
-		LogInfo("UID 为空，重新获取")
-		GetUIDStatus()
-	}
+func GetGUID(uidIndex int) error {
 
-	encrypredUID, _ := EncryptByPublicKey(UID, PubKey)
+	encrypredUID, _ := EncryptByPublicKey(UIDsData[uidIndex].UID, PubKey)
 	// 构造 JSON 数据
 	requestBody := map[string]string{
 		"device_name": "央视频电视投屏助手",
@@ -50,7 +77,7 @@ func GetGUID() error {
 	// 创建请求主体
 	reqBody := bytes.NewBuffer([]byte(jsonData))
 	url := UrlCloudwsRegister
-	if UIDInit {
+	if UIDsData[uidIndex].UIDInit {
 		url = UrlCloudwsGet
 	}
 	LogDebug("UrlCloudws：", url)
@@ -64,7 +91,7 @@ func GetGUID() error {
 	// 设置请求头
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.8")
-	req.Header.Set("UID", UID)
+	req.Header.Set("UID", UIDsData[uidIndex].UID)
 	req.Header.Set("Referer", Referer)
 	req.Header.Set("User-Agent", UA)
 	req.Header.Set("Content-Type", "application/json")
@@ -88,22 +115,15 @@ func GetGUID() error {
 	}
 	if result["result"] == 0.0 {
 		data := result["data"].(map[string]interface{})
-		GUID = data["guid"].(string)
-		if !UIDInit {
-			dataJson := ReadJsonFile("./data.json")
-			dataJson.Init = true
-			WriteJsonFile(dataJson, "./data.json")
-		}
+		UIDsData[uidIndex].GUID = data["guid"].(string)
+		UIDsData[uidIndex].UIDInit = true
+
 	} else if result["result"] == 604.0 {
-		dataJson := ReadJsonFile("./data.json")
-		dataJson.Init = true
-		WriteJsonFile(dataJson, "./data.json")
-		GetGUID()
-	} else if result["result"] == 605.0 {
-		dataJson := ReadJsonFile("./data.json")
-		dataJson.Init = false
-		WriteJsonFile(dataJson, "./data.json")
-		GetGUID()
+		UIDsData[uidIndex].UIDInit = true
+		GetGUID(uidIndex)
+	} else if result["result"] == 605.0 || result["result"] == 601.0 {
+		UIDsData[uidIndex].UIDInit = false
+		GetGUID(uidIndex)
 	} else {
 		LogError("GetGUID 未知错误：", result["result"])
 	}
@@ -112,60 +132,63 @@ func GetGUID() error {
 
 }
 
-func CheckPlayAuth() bool {
-	// 构造 JSON 数据
-	requestBody := map[string]string{
-		"guid": GUID,
-	}
-	// 转换为 JSON 字符串
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		LogError("Error marshalling JSON:", err)
+func CheckPlayAuth() {
+	var i int
+	for i = 0; i < UIDCount; i++ {
+		// 构造 JSON 数据
+		requestBody := map[string]string{
+			"guid": UIDsData[i].GUID,
+		}
+		// 转换为 JSON 字符串
+		jsonData, err := json.Marshal(requestBody)
+		if err != nil {
+			LogError("Error marshalling JSON:", err)
+		}
+
+		// 创建请求主体
+		reqBody := bytes.NewBuffer([]byte(jsonData))
+		// 创建 HTTP 请求
+		req, err := http.NewRequest("POST", UrlCheckPlayAuth, reqBody)
+		if err != nil {
+			LogError("Error creating request:", err)
+		}
+
+		// 设置请求头
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Accept-Language", "zh-CN,zh;q=0.8")
+		req.Header.Set("UID", UIDsData[i].UID)
+		req.Header.Set("Referer", Referer)
+		req.Header.Set("User-Agent", UA)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Cache-Control", "no-cache")
+
+		// 执行请求并读取响应
+		//client := &http.Client{}
+		resp, err := Client.Do(req)
+		if err != nil {
+			LogError("UID", i, " 请求失败：", err)
+		}
+		defer resp.Body.Close()
+		var body strings.Builder
+		_, _ = io.Copy(&body, resp.Body)
+		LogDebug("CheckPlayAuth结果：", body.String())
+		// 解析 JSON 响应
+		var result map[string]interface{}
+		e2 := json.Unmarshal([]byte(body.String()), &result)
+		if e2 != nil {
+			LogError("UID", i, " 播放授权失败", e2)
+		}
+		if result["message"].(string) == "SUCCESS" {
+			LogInfo("UID", i, " 播放授权成功")
+
+		} else {
+			LogError("UID", i, " 播放授权失败")
+		}
 	}
 
-	// 创建请求主体
-	reqBody := bytes.NewBuffer([]byte(jsonData))
-	// 创建 HTTP 请求
-	req, err := http.NewRequest("POST", UrlCheckPlayAuth, reqBody)
-	if err != nil {
-		LogError("Error creating request:", err)
-	}
-
-	// 设置请求头
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.8")
-	req.Header.Set("UID", UID)
-	req.Header.Set("Referer", Referer)
-	req.Header.Set("User-Agent", UA)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Cache-Control", "no-cache")
-
-	// 执行请求并读取响应
-	//client := &http.Client{}
-	resp, err := Client.Do(req)
-	if err != nil {
-		LogError("请求失败：", err)
-		return false
-	}
-	defer resp.Body.Close()
-	var body strings.Builder
-	_, _ = io.Copy(&body, resp.Body)
-	LogDebug("CheckPlayAuth结果：", body.String())
-	// 解析 JSON 响应
-	var result map[string]interface{}
-	e2 := json.Unmarshal([]byte(body.String()), &result)
-	if e2 != nil {
-		return false
-	}
-	if result["message"].(string) == "SUCCESS" {
-		LogInfo("播放授权成功")
-		return true
-	} else {
-		return false
-	}
 }
 
-func GetBaseM3uUrl(liveID string) string {
+func GetBaseM3uUrl(liveID string, uidIndex int) string {
 	LogDebug("LiveID ", liveID)
 	// // 使用 crypto/rand 生成一个范围内的随机数
 	// max := big.NewInt(int64(len(DeviceModel))) // 设置最大范围为 len(DeviceModele)
@@ -182,7 +205,7 @@ func GetBaseM3uUrl(liveID string) string {
 		"deviceId": map[string]string{
 			"serial":     "",
 			"imei":       "",
-			"android_id": UID,
+			"android_id": UIDsData[uidIndex].UID,
 		},
 	}
 
@@ -203,7 +226,7 @@ func GetBaseM3uUrl(liveID string) string {
 	// 设置请求头
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.8")
-	req.Header.Set("UID", UID)
+	req.Header.Set("UID", UIDsData[uidIndex].UID)
 	req.Header.Set("Referer", Referer)
 	req.Header.Set("User-Agent", UA)
 	req.Header.Set("Content-Type", "application/json")
@@ -246,11 +269,11 @@ func GetBaseM3uUrl(liveID string) string {
 }
 
 func GetAppSecret() bool {
-	if GUID == "" {
+	if UIDsData[0].GUID == "" {
 		LogInfo("GUID 为空，重新获取")
-		GetGUID()
+		GetGUID(0)
 	}
-	encryptedGUID, _ := EncryptByPublicKey(GUID, PubKey)
+	encryptedGUID, _ := EncryptByPublicKey(UIDsData[0].GUID, PubKey)
 	// 构造 JSON 数据
 	requestBody := map[string]string{
 		"guid": encryptedGUID,
@@ -272,7 +295,7 @@ func GetAppSecret() bool {
 	// 设置请求头
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.8")
-	req.Header.Set("UID", UID)
+	req.Header.Set("UID", UIDsData[0].GUID)
 	req.Header.Set("Referer", Referer)
 	req.Header.Set("User-Agent", UA)
 	req.Header.Set("Content-Type", "application/json")

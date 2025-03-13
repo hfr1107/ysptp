@@ -56,8 +56,14 @@ func main() {
 	host := flag.String("host", "0.0.0.0", "host")
 	port := flag.String("p", "16384", "port")
 	flag.BoolVar(&live.DebugMode, "debug", false, "是否开启调试模式")
-
+	flag.IntVar(&live.UIDCount, "UIDCount", 3, "UID负载均衡的个数，范围3到8")
 	flag.Parse()
+	if live.UIDCount < 3 {
+		live.UIDCount = 3
+	}
+	if live.UIDCount > 8 {
+		live.UIDCount = 8
+	}
 	// live.Host = *host
 	// live.Port = *port
 
@@ -88,11 +94,11 @@ func main() {
 	// live.GetBaseM3uUrl("Live1704872878572161")
 	// live.GetBaseM3uUrl("Live1688400593818102")
 
-	live.GetUIDStatus()
-	live.GetGUID()
+	live.GetUIDs()
+	live.GetGUIDs()
 	live.CheckPlayAuth()
 	live.GetAppSecret()
-	live.SetCache("check", "", "", "", "")
+	//live.SetCache("check", "", "", "", "", "")
 
 	// live.LogInfo("开始初始化缓存")
 	// live.RefreshM3u8Cache()

@@ -6,17 +6,17 @@ import (
 )
 
 type Data struct {
-	UID  string `json:"UID"`
-	Init bool   `json:"Init"`
+	UIDs []string `json:"uids"`
+	Init bool     `json:"init"`
 }
 
-func ReadJsonFile(file string) Data {
+func ReadJsonFile(file string) (Data, bool) {
 	// 读取配置文件
 	data, err := os.ReadFile(file)
 	if err != nil {
 		//log.Fatal("Error reading config file:", err)
 		LogError("Error reading config file:", err)
-		return Data{}
+		return Data{}, false
 	}
 
 	// 创建一个配置对象
@@ -27,9 +27,9 @@ func ReadJsonFile(file string) Data {
 	if err != nil {
 		//log.Fatal("Error unmarshalling config data:", err)
 		LogError("Error unmarshalling config data:", err)
-		return Data{}
+		return Data{}, false
 	}
-	return dataCache
+	return dataCache, true
 }
 func WriteJsonFile(data Data, file string) {
 	// 将配置对象转换为 JSON 字符串

@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"math/rand"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -16,9 +18,16 @@ import (
 type Ysptp struct {
 }
 
+var basem3uCache sync.Map
 var m3uCache sync.Map
 
+type BaseM3uCacheItem struct {
+	baseUrl    string
+	Expiration int64
+}
+
 type M3uCacheItem struct {
+	uid          string
 	playUrl      string
 	Expiration   int64
 	appRandomStr string
@@ -27,22 +36,6 @@ type M3uCacheItem struct {
 }
 
 func (y *Ysptp) HandleMainRequest(c *gin.Context, vid string) {
-	// if !UIDInit {
-	// 	GetUIDStatus()
-	// 	GetGUID()
-	// 	CheckPlayAuth()
-	// 	GetAppSecret()
-	// }
-	// _, _, _, _, flag := GetCache("check")
-	// if !flag {
-	// 	CheckPlayAuth()
-	// 	GetAppSecret()
-	// 	SetCache("check", "", "", "", "")
-	// }
-
-	// 从 HTTP 请求的查询参数中获取 "uid"，如果未提供则使用默认值 "1234123122"
-	//uid := c.DefaultQuery("uid", "1234123122")
-	uid := UID
 
 	// 检查全局变量 cctvList 中是否包含指定的 ID
 	// 如果找不到对应的 ID，返回 404 错误并终止函数
@@ -52,7 +45,7 @@ func (y *Ysptp) HandleMainRequest(c *gin.Context, vid string) {
 	}
 
 	// 调用自定义函数 getURL，根据 ID、基础 URL、用户 UID 和 path 获取视频数据
-	header, data, urlPath := getURL(vid, CCTVList[vid], uid)
+	header, data, urlPath := getURL(vid, CCTVList[vid])
 	for key, values := range header {
 		// 删除Gin自动设置的Content-Type
 		if key == "Content-Type" {
@@ -86,12 +79,6 @@ func (y *Ysptp) HandleMainRequest(c *gin.Context, vid string) {
 
 // 处理 TS 请求，返回 TS 视频流数据
 func (y *Ysptp) HandleTsRequest(c *gin.Context, ts, vid string, wsTime string, wsSecret string) {
-	// _, _, _, _, flag := GetCache("check")
-	// if !flag {
-	// 	CheckPlayAuth()
-	// 	GetAppSecret()
-	// 	SetCache("check", "", "", "", "")
-	// }
 
 	// 构建请求数据
 	wT := ""
@@ -103,10 +90,7 @@ func (y *Ysptp) HandleTsRequest(c *gin.Context, ts, vid string, wsTime string, w
 		wS = "&wsSecret=" + wsSecret
 	}
 	data := ts + wT + wS
-	//uid := c.DefaultQuery("uid", "121323241")
-	uid := UID
-	cacheKey := vid + uid
-	_, appSign, appRandomStr, _, found := GetCache(cacheKey)
+	uid, _, appSign, appRandomStr, _, found := GetCache(vid)
 	if !found {
 		LogError("未知的ts", ts)
 		c.String(http.StatusNotFound, "ts not found!")
@@ -119,23 +103,33 @@ func (y *Ysptp) HandleTsRequest(c *gin.Context, ts, vid string, wsTime string, w
 }
 
 // 获取视频 URL，若缓存中存在则直接返回，否则发起请求获取
-func getURL(vid, liveID, uid string) (http.Header, string, string) {
-	// 生成缓存键
-	cacheKey := vid + uid
+func getURL(vid, liveID string) (http.Header, string, string) {
+
 	// 查找缓存
-	if playURL, appSign, appRandomStr, urlPath, found := GetCache(cacheKey); found {
+	if uid, playURL, appSign, appRandomStr, urlPath, found := GetCache(vid); found {
 		// 如果缓存中有，返回缓存中的数据
 		//fmt.Println("命中缓存", cacheKey)
 		header, data := fetchData(playURL, uid, appSign, appRandomStr, urlPath)
 		return header, data, urlPath
 	}
 
-	baseM3u8Url := GetBaseM3uUrl(liveID)
-	if baseM3u8Url == "" {
-		LogError("获取base m3u8地址失败")
-		//return "", ""
-		//panic("获取base m3u8地址失败")
-		return nil, "", ""
+	// 初始化随机数种子（使用纳秒时间戳确保每次运行结果不同）
+	rand.Seed(time.Now().UnixNano())
+
+	// 生成随机整数
+	uidIndex := rand.Intn(UIDCount)
+	uid := UIDsData[uidIndex].UID
+
+	baseM3u8Url, found := GetBaseM3uCache(vid)
+	if !found {
+		baseM3u8Url = GetBaseM3uUrl(liveID, uidIndex)
+		if baseM3u8Url == "" {
+			LogError("获取base m3u8地址失败")
+			//return "", ""
+			//panic("获取base m3u8地址失败")
+			return nil, "", ""
+		}
+		SetBaseM3uCache(vid, baseM3u8Url)
 	}
 
 	// POST 数据
@@ -179,13 +173,16 @@ func getURL(vid, liveID, uid string) (http.Header, string, string) {
 
 	// 解析 JSON 响应
 	var result map[string]interface{}
-	json.Unmarshal([]byte(body.String()), &result)
+	e := json.Unmarshal([]byte(body.String()), &result)
+	if e != nil {
+		return nil, "", ""
+	}
 	playURL := result["url"].(string)
 	urlPath := ExtractUrlPath(playURL)
 	LogDebug("playURL:", playURL)
 
 	// 将结果缓存起来
-	SetCache(cacheKey, playURL, appRandomStr, appSign, urlPath)
+	SetCache(vid, uid, playURL, appRandomStr, appSign, urlPath)
 
 	header, data := fetchData(playURL, uid, appSign, appRandomStr, urlPath)
 	// 返回获取的数据
@@ -297,22 +294,23 @@ func getTs(url string, uid string, appSign string, appRandomStr string) string {
 }
 
 // 从缓存中获取数据
-func GetCache(key string) (string, string, string, string, bool) {
+func GetCache(key string) (string, string, string, string, string, bool) {
 	// 查找缓存
 	if item, found := m3uCache.Load(key); found {
 		cacheItem := item.(M3uCacheItem)
 		// 检查缓存是否过期
 		if time.Now().Unix() < cacheItem.Expiration {
-			return cacheItem.playUrl, cacheItem.appSign, cacheItem.appRandomStr, cacheItem.urlPath, true
+			return cacheItem.uid, cacheItem.playUrl, cacheItem.appSign, cacheItem.appRandomStr, cacheItem.urlPath, true
 		}
 	}
 	// 如果没有找到或缓存已过期，返回空
-	return "", "", "", "", false
+	return "", "", "", "", "", false
 }
 
 // 设置缓存数据
-func SetCache(key, playUrl, appRandomStr, appSign, urlPath string) {
+func SetCache(key, uid, playUrl, appRandomStr, appSign, urlPath string) {
 	m3uCache.Store(key, M3uCacheItem{
+		uid:          uid,
 		playUrl:      playUrl,
 		Expiration:   time.Now().Unix() + 2000,
 		appRandomStr: appRandomStr,
@@ -321,30 +319,51 @@ func SetCache(key, playUrl, appRandomStr, appSign, urlPath string) {
 	})
 }
 
-func RefreshM3u8Cache() {
-	_, _, _, _, flag := GetCache("check")
-	if !flag {
-		CheckPlayAuth()
-		GetAppSecret()
-		SetCache("check", "", "", "", "")
+// 从缓存中获取数据
+func GetBaseM3uCache(key string) (string, bool) {
+	// 查找缓存
+	if item, found := basem3uCache.Load(key); found {
+		cacheItem := item.(BaseM3uCacheItem)
+		// 检查缓存是否过期
+		if time.Now().Unix() < cacheItem.Expiration {
+			return cacheItem.baseUrl, true
+		}
 	}
+	// 如果没有找到或缓存已过期，返回空
+	return "", false
+}
+
+func SetBaseM3uCache(key, baseM3uUrl string) {
+	basem3uCache.Store(key, BaseM3uCacheItem{
+		baseUrl:    baseM3uUrl,
+		Expiration: time.Now().Unix() + 43200,
+	})
+}
+
+func RefreshM3u8Cache() {
+
+	GetAppSecret()
+	rand.Seed(time.Now().UnixNano())
+	uidIndex := rand.Intn(UIDCount)
+
 	LogInfo("刷新缓存中...")
 	for vid, liveID := range CCTVList {
-
-		// 生成缓存键
-		cacheKey := vid + UID
-		baseM3u8Url := GetBaseM3uUrl(liveID)
-		if baseM3u8Url == "" {
-			LogError("获取base m3u8地址失败")
-			LogError("可能触发风控，停止缓存")
-			break
-			//return "", ""
-			//panic("获取base m3u8地址失败")
+		baseM3u8Url, found := GetBaseM3uCache(vid)
+		if !found {
+			baseM3u8Url = GetBaseM3uUrl(liveID, uidIndex)
+			if baseM3u8Url == "" {
+				LogError("获取base m3u8地址失败")
+				LogError("可能触发风控，停止缓存")
+				break
+				//return "", ""
+				//panic("获取base m3u8地址失败")
+			}
+			SetBaseM3uCache(vid, baseM3u8Url)
 		}
 
 		// POST 数据
 		postData := map[string]string{
-			"appcommon": `{"adid":"` + UID + `","av":"` + AppVersion + `","an":"央视视频电视投屏助手","ap":"cctv_app_tv"}`,
+			"appcommon": `{"adid":"` + UIDsData[uidIndex].UID + `","av":"` + AppVersion + `","an":"央视视频电视投屏助手","ap":"cctv_app_tv"}`,
 			"url":       baseM3u8Url,
 		}
 		// postData := map[string]string{
@@ -360,7 +379,7 @@ func RefreshM3u8Cache() {
 		req, _ := http.NewRequest("POST", UrlGetStream, strings.NewReader(EncodeFormData(postData)))
 		req.Header.Set("User-Agent", UA)
 		req.Header.Set("Referer", Referer)
-		req.Header.Set("UID", UID)
+		req.Header.Set("UID", UIDsData[uidIndex].UID)
 		req.Header.Set("APPID", AppId)
 		req.Header.Set("APPSIGN", appSign)
 		req.Header.Set("APPRANDOMSTR", appRandomStr)
@@ -371,6 +390,7 @@ func RefreshM3u8Cache() {
 		resp, err := Client.Do(req)
 		if err != nil {
 			LogError("请求失败：", err)
+			break
 			//return "", ""
 			//panic(err)
 		}
@@ -382,13 +402,22 @@ func RefreshM3u8Cache() {
 
 		// 解析 JSON 响应
 		var result map[string]interface{}
-		json.Unmarshal([]byte(body.String()), &result)
+		e := json.Unmarshal([]byte(body.String()), &result)
+		if e != nil {
+			break
+		}
+		succeed := result["succeed"].(float64)
+		if succeed != 1.0 {
+			break
+		}
+
 		playURL := result["url"].(string)
 		urlPath := ExtractUrlPath(playURL)
 		LogDebug("playURL:", playURL)
 
 		// 将结果缓存起来
-		SetCache(cacheKey, playURL, appRandomStr, appSign, urlPath)
+		SetCache(vid, UIDsData[uidIndex].UID, playURL, appRandomStr, appSign, urlPath)
+		uidIndex = (uidIndex + 1) % UIDCount
 		time.Sleep(10 * time.Second)
 	}
 	LogInfo("缓存刷新完成")
