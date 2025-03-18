@@ -119,6 +119,7 @@ func getURL(vid, liveID string) (http.Header, string, string) {
 	// 生成随机整数
 	uidIndex := rand.Intn(UIDCount)
 	uid := UIDsData[uidIndex].UID
+	LogDebug("使用UID ", uidIndex)
 
 	baseM3u8Url, found := GetBaseM3uCache(vid)
 	if !found {
@@ -169,7 +170,7 @@ func getURL(vid, liveID string) (http.Header, string, string) {
 	var body strings.Builder
 	_, _ = io.Copy(&body, resp.Body)
 
-	LogDebug("getstream结果：", body.String())
+	// LogDebug("getstream结果：", body.String())
 
 	// 解析 JSON 响应
 	var result map[string]interface{}
@@ -343,11 +344,17 @@ func SetBaseM3uCache(key, baseM3uUrl string) {
 func RefreshM3u8Cache() {
 
 	GetAppSecret()
+
+	if !EnableCache {
+		return
+	}
+
 	rand.Seed(time.Now().UnixNano())
 	uidIndex := rand.Intn(UIDCount)
 
 	LogInfo("刷新缓存中...")
 	for vid, liveID := range CCTVList {
+		LogDebug("使用UID ", uidIndex)
 		baseM3u8Url, found := GetBaseM3uCache(vid)
 		if !found {
 			baseM3u8Url = GetBaseM3uUrl(liveID, uidIndex)

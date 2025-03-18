@@ -9,7 +9,11 @@ import (
 // var Port string = "16384"
 var DebugMode = false
 
+var EnableCache = false
+
 var UIDCount = 3
+
+const UIDMax = 8
 
 type UIDData struct {
 	UID     string

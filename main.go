@@ -55,14 +55,18 @@ func main() {
 
 	host := flag.String("host", "0.0.0.0", "host")
 	port := flag.String("p", "16384", "port")
-	flag.BoolVar(&live.DebugMode, "debug", false, "是否开启调试模式")
+	flag.BoolVar(&live.DebugMode, "debug", false, "开启调试模式")
 	flag.IntVar(&live.UIDCount, "UIDCount", 3, "UID负载均衡的个数，范围3到8")
+	flag.BoolVar(&live.EnableCache, "cache", false, "启用预先缓存")
 	flag.Parse()
 	if live.UIDCount < 3 {
 		live.UIDCount = 3
 	}
-	if live.UIDCount > 8 {
-		live.UIDCount = 8
+	if live.UIDCount > live.UIDMax {
+		live.UIDCount = live.UIDMax
+	}
+	if live.UIDCount < 6 && live.EnableCache {
+		live.UIDCount = 6
 	}
 	// live.Host = *host
 	// live.Port = *port
