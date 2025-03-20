@@ -70,13 +70,13 @@ var CCTVList = map[string]string{
 	"cctv8k_36m.m3u8": "Live1688400593818102",
 }
 
-var DeviceModel = [...]string{
-	"Sony-KD-85Z9G",
-	"Sony-KD-55A90J",
-	"LG-OLED65C1",
-	"Samsung-QN65Q90TAFXZA",
-	"Samsung-QN85QN900BFXZA",
-}
+// var DeviceModel = [...]string{
+// 	"Sony-KD-85Z9G",
+// 	"Sony-KD-55A90J",
+// 	"LG-OLED65C1",
+// 	"Samsung-QN65Q90TAFXZA",
+// 	"Samsung-QN85QN900BFXZA",
+// }
 
 var Client = &http.Client{
 	Timeout: 10 * time.Second,

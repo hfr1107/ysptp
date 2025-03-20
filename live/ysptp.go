@@ -119,7 +119,7 @@ func getURL(vid, liveID string) (http.Header, string, string) {
 	// 生成随机整数
 	uidIndex := rand.Intn(UIDCount)
 	uid := UIDsData[uidIndex].UID
-	LogDebug("使用UID ", uidIndex)
+	LogDebug(vid, " 使用UID ", uidIndex)
 
 	baseM3u8Url, found := GetBaseM3uCache(vid)
 	if !found {
@@ -143,6 +143,8 @@ func getURL(vid, liveID string) (http.Header, string, string) {
 	// 	"url":       "http://live-tpgq.cctv.cn/live/3e1b6788736d5a9507c7f9f627ff04f8.m3u8",
 	// }
 
+	retry := 2
+REPEAT:
 	appRandomStr := uuid.New().String()
 	appSignStr := AppId + AppSecret + appRandomStr
 	appSign := Md5Encrypt(appSignStr)
@@ -170,12 +172,25 @@ func getURL(vid, liveID string) (http.Header, string, string) {
 	var body strings.Builder
 	_, _ = io.Copy(&body, resp.Body)
 
-	// LogDebug("getstream结果：", body.String())
+	LogDebug("getstream结果：", body.String())
 
 	// 解析 JSON 响应
 	var result map[string]interface{}
 	e := json.Unmarshal([]byte(body.String()), &result)
 	if e != nil {
+		LogError(e)
+		return nil, "", ""
+	}
+
+	if result["succeed"].(float64) != 1.0 {
+		LogError("getstream 错误")
+		if retry > 0 {
+			GetAppSecret()
+			LogError("剩余", retry, "次重试")
+			uidIndex = (uidIndex + 1) % UIDCount
+			retry = retry - 1
+			goto REPEAT
+		}
 		return nil, "", ""
 	}
 	playURL := result["url"].(string)
@@ -242,7 +257,7 @@ func fetchData(playURL string, uid string, appSign string, appRandomStr, urlPath
 		//fmt.Printf("响应头: %+v\n", resp.Header)
 		//fmt.Printf("响应内容长度: %d bytes\n", len(body))
 
-		LogDebug("fetchData结果：", body.String())
+		// LogDebug("fetchData结果：", body.String())
 
 		// 使用正则表达式匹配返回数据中的 m3u8 播放链接
 		re := regexp.MustCompile(`(.*\.m3u8\?.*)`) // 匹配带有 `.m3u8` 文件及其查询参数的字符串
@@ -313,7 +328,7 @@ func SetCache(key, uid, playUrl, appRandomStr, appSign, urlPath string) {
 	m3uCache.Store(key, M3uCacheItem{
 		uid:          uid,
 		playUrl:      playUrl,
-		Expiration:   time.Now().Unix() + 2000,
+		Expiration:   time.Now().Unix() + 3600,
 		appRandomStr: appRandomStr,
 		appSign:      appSign,
 		urlPath:      urlPath,
@@ -352,25 +367,40 @@ func RefreshM3u8Cache() {
 	rand.Seed(time.Now().UnixNano())
 	uidIndex := rand.Intn(UIDCount)
 
+	var uidCount int
+	var uidsData []UIDData
+
+	uidCount = UIDCount
+	uidsData = UIDsData
+
 	LogInfo("刷新缓存中...")
 	for vid, liveID := range CCTVList {
-		LogDebug("使用UID ", uidIndex)
+		retry := 2
+	REPEAT:
+		LogDebug(vid, " 使用UID ", uidsData[uidIndex].UID)
 		baseM3u8Url, found := GetBaseM3uCache(vid)
 		if !found {
 			baseM3u8Url = GetBaseM3uUrl(liveID, uidIndex)
 			if baseM3u8Url == "" {
 				LogError("获取base m3u8地址失败")
-				LogError("可能触发风控，停止缓存")
-				break
-				//return "", ""
-				//panic("获取base m3u8地址失败")
+				// if uidCount > 1 {
+				// 	uidCount = uidCount - 1
+				// 	uidsData = append(uidsData[:uidIndex], uidsData[uidIndex+1:]...)
+				// 	uidIndex = uidIndex % uidCount
+				// 	time.Sleep(10 * time.Second)
+				// 	goto REPEAT
+				// } else {
+				// 	break
+				// }
+				continue
+
 			}
 			SetBaseM3uCache(vid, baseM3u8Url)
 		}
 
 		// POST 数据
 		postData := map[string]string{
-			"appcommon": `{"adid":"` + UIDsData[uidIndex].UID + `","av":"` + AppVersion + `","an":"央视视频电视投屏助手","ap":"cctv_app_tv"}`,
+			"appcommon": `{"adid":"` + uidsData[uidIndex].UID + `","av":"` + AppVersion + `","an":"央视视频电视投屏助手","ap":"cctv_app_tv"}`,
 			"url":       baseM3u8Url,
 		}
 		// postData := map[string]string{
@@ -386,7 +416,7 @@ func RefreshM3u8Cache() {
 		req, _ := http.NewRequest("POST", UrlGetStream, strings.NewReader(EncodeFormData(postData)))
 		req.Header.Set("User-Agent", UA)
 		req.Header.Set("Referer", Referer)
-		req.Header.Set("UID", UIDsData[uidIndex].UID)
+		req.Header.Set("UID", uidsData[uidIndex].UID)
 		req.Header.Set("APPID", AppId)
 		req.Header.Set("APPSIGN", appSign)
 		req.Header.Set("APPRANDOMSTR", appRandomStr)
@@ -397,7 +427,7 @@ func RefreshM3u8Cache() {
 		resp, err := Client.Do(req)
 		if err != nil {
 			LogError("请求失败：", err)
-			break
+			continue
 			//return "", ""
 			//panic(err)
 		}
@@ -411,11 +441,29 @@ func RefreshM3u8Cache() {
 		var result map[string]interface{}
 		e := json.Unmarshal([]byte(body.String()), &result)
 		if e != nil {
-			break
+			LogError("getstream 解析错误")
+			continue
 		}
 		succeed := result["succeed"].(float64)
 		if succeed != 1.0 {
-			break
+			LogError("getstream 错误")
+			// if uidCount > 1 {
+			// 	uidCount = uidCount - 1
+			// 	uidsData = append(uidsData[:uidIndex], uidsData[uidIndex+1:]...)
+			// 	uidIndex = uidIndex % uidCount
+			// 	time.Sleep(10 * time.Second)
+			// 	goto REPEAT
+			// }
+			// break
+			if retry > 0 {
+				LogError("剩余", retry, "次重试")
+				GetAppSecret() //AppSecret每小时0分刷新
+				retry = retry - 1
+				uidIndex = (uidIndex + 1) % uidCount
+				time.Sleep(10 * time.Second)
+				goto REPEAT
+			}
+			continue
 		}
 
 		playURL := result["url"].(string)
@@ -423,8 +471,8 @@ func RefreshM3u8Cache() {
 		LogDebug("playURL:", playURL)
 
 		// 将结果缓存起来
-		SetCache(vid, UIDsData[uidIndex].UID, playURL, appRandomStr, appSign, urlPath)
-		uidIndex = (uidIndex + 1) % UIDCount
+		SetCache(vid, uidsData[uidIndex].UID, playURL, appRandomStr, appSign, urlPath)
+		uidIndex = (uidIndex + 1) % uidCount
 		time.Sleep(10 * time.Second)
 	}
 	LogInfo("缓存刷新完成")
