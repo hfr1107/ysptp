@@ -257,7 +257,7 @@ func fetchData(playURL string, uid string, appSign string, appRandomStr, urlPath
 		//fmt.Printf("响应头: %+v\n", resp.Header)
 		//fmt.Printf("响应内容长度: %d bytes\n", len(body))
 
-		// LogDebug("fetchData结果：", body.String())
+		//LogDebug("fetchData结果：", body.String())
 
 		// 使用正则表达式匹配返回数据中的 m3u8 播放链接
 		re := regexp.MustCompile(`(.*\.m3u8\?.*)`) // 匹配带有 `.m3u8` 文件及其查询参数的字符串
@@ -328,7 +328,7 @@ func SetCache(key, uid, playUrl, appRandomStr, appSign, urlPath string) {
 	m3uCache.Store(key, M3uCacheItem{
 		uid:          uid,
 		playUrl:      playUrl,
-		Expiration:   time.Now().Unix() + 3600,
+		Expiration:   time.Now().Unix() + 2000,
 		appRandomStr: appRandomStr,
 		appSign:      appSign,
 		urlPath:      urlPath,

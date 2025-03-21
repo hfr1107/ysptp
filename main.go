@@ -127,7 +127,7 @@ func main() {
 // 定时执行的函数
 func timedFunction(done <-chan bool) {
 	// 创建一个定时器，每隔 ? 秒触发一次
-	ticker := time.NewTicker(3300 * time.Second)
+	ticker := time.NewTicker(1600 * time.Second)
 	defer ticker.Stop() // 确保结束时释放资源
 
 	for {
