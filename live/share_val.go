@@ -1,6 +1,7 @@
 package live
 
 import (
+	"crypto/tls"
 	"net/http"
 	"time"
 )
@@ -81,6 +82,7 @@ var CCTVList = map[string]string{
 var Client = &http.Client{
 	Timeout: 10 * time.Second,
 	Transport: &http.Transport{
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
 		ForceAttemptHTTP2:   false,
 		MaxIdleConnsPerHost: 100,
 		IdleConnTimeout:     30 * time.Second,

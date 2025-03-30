@@ -11,6 +11,8 @@ import (
 
 var tvM3uObj m3u.Tvm3u
 var ysptpObj live.Ysptp
+var btimeObj live.Btime
+var m1905Obj live.M1905
 
 // 设置路由和处理逻辑
 func setupRouter() *gin.Engine {
@@ -46,6 +48,15 @@ func setupRouter() *gin.Engine {
 			ysptpObj.HandleTsRequest(c, ts, rid, c.Query("wsTime"), c.Query("wsSecret"))
 		}
 
+	})
+
+	r.GET("/btime/:rid", func(c *gin.Context) {
+		rid := c.Param("rid")
+		btimeObj.HandleMainRequest(c, rid)
+	})
+
+	r.GET("/m1905/cctv6.m3u8", func(c *gin.Context) {
+		m1905Obj.HandleMainRequest(c)
 	})
 
 	return r
@@ -102,7 +113,6 @@ func main() {
 	live.GetGUIDs()
 	live.CheckPlayAuth()
 	live.GetAppSecret()
-	//live.SetCache("check", "", "", "", "", "")
 
 	// live.LogInfo("开始初始化缓存")
 	// live.RefreshM3u8Cache()
