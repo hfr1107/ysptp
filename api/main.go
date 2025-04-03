@@ -1,12 +1,14 @@
 package api
-
-
 import (
 	"net/http"
+	"ysptp/live"
 	"github.com/gin-gonic/gin"
 )
+var tvM3uObj m3u.Tvm3u
+var ysptpObj live.Ysptp
+var btimeObj live.Btime
+var m1905Obj live.M1905
 
-//
 func Register(r *gin.Engine) {
 	r.NoRoute(ErrRouter)
 
@@ -16,6 +18,9 @@ func Register(r *gin.Engine) {
 
 	r.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "请求成功！")
+	})
+	r.GET("/m1905/cctv6.m3u8", func(c *gin.Context) {
+		m1905Obj.HandleMainRequest(c)
 	})
 /*
 	r.GET("/:path/:rid", func(c *gin.Context) {
