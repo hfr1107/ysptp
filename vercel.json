@@ -1,7 +1,7 @@
 {
   "routes": [
     {
-      "src": "/live/.*",
+      "src": "/ysptp/.*",
       "dest": "/api/live.go"
     },
     {
@@ -14,7 +14,7 @@
     },
     {
       "src": "/.*",
-      "dest": "/main.go"
+      "dest": "/api/main.go"
     }
   ]
 }
