@@ -10,13 +10,6 @@ var ysptpObj live.Ysptp
 var btimeObj live.Btime
 var m1905Obj live.M1905
 
-
-live.GetUIDs()
-	live.GetGUIDs()
-	live.CheckPlayAuth()
-	live.GetAppSecret()
-
-
 func Register(r *gin.Engine) {
 	r.NoRoute(ErrRouter)
 
@@ -97,6 +90,12 @@ var (
 // @schemes https http
 // @host golang-vercel.vercel.app
 func init() {
+	live.GetUIDs()
+	live.GetGUIDs()
+	live.CheckPlayAuth()
+	live.GetAppSecret()
+
+	
 	app = gin.New()
 	Register(app)
 }
