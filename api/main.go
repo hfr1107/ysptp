@@ -23,6 +23,10 @@ func Register(r *gin.Engine) {
 	r.GET("/m1905/cctv6.m3u8", func(c *gin.Context) {
 		m1905Obj.HandleMainRequest(c)
 	})
+	r.GET("/btime/:rid", func(c *gin.Context) {
+		rid := c.Param("rid")
+		btimeObj.HandleMainRequest(c, rid)
+	})
 /*
 	r.GET("/:path/:rid", func(c *gin.Context) {
 		enableTV := true
