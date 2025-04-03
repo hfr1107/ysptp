@@ -10,6 +10,13 @@ var ysptpObj live.Ysptp
 var btimeObj live.Btime
 var m1905Obj live.M1905
 
+
+live.GetUIDs()
+	live.GetGUIDs()
+	live.CheckPlayAuth()
+	live.GetAppSecret()
+
+
 func Register(r *gin.Engine) {
 	r.NoRoute(ErrRouter)
 
