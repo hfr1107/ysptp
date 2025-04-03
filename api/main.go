@@ -13,7 +13,7 @@ var tvM3uObj m3u.Tvm3u
 var ysptpObj live.Ysptp
 var btimeObj live.Btime
 var m1905Obj live.M1905
-
+/*
 // 设置路由和处理逻辑
 func setupRouter() *gin.Engine {
 	// 设置Gin为发布模式
@@ -153,7 +153,7 @@ func timedFunction(done <-chan bool) {
 	}
 }
 
-
+*/
 
 func Register(r *gin.Engine) {
 	r.NoRoute(ErrRouter)
