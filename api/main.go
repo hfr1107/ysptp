@@ -1,20 +1,12 @@
 package api
 
+
 import (
-	"flag"
-	"time"
-	"ysptp/live"
-	"ysptp/m3u"
-        "net/http"
+	"net/http"
 	"github.com/gin-gonic/gin"
 )
 
-var tvM3uObj m3u.Tvm3u
-var ysptpObj live.Ysptp
-var btimeObj live.Btime
-var m1905Obj live.M1905
-
-
+//
 func Register(r *gin.Engine) {
 	r.NoRoute(ErrRouter)
 
@@ -25,7 +17,7 @@ func Register(r *gin.Engine) {
 	r.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "请求成功！")
 	})
-
+/*
 	r.GET("/:path/:rid", func(c *gin.Context) {
 		enableTV := true
 		//path := c.Param("path")
@@ -41,8 +33,11 @@ func Register(r *gin.Engine) {
 				itvobj.HandleTsRequest(c, ts)
 			}
 		} else {
-			c.String(http.StatusForbidden,
-/*
+			c.String(http.StatusForbidden, "公共服务不提供TV直播")
+		}	
+	})
+ 
+
 	app.GET("/ping", handler.Ping)
         app.GET("/:path/:rid", handler.Feiyang)
 	route := app.Group("/api")
@@ -58,6 +53,8 @@ func ErrRouter(c *gin.Context) {
 		"errors": "this page could not be found",
 	})
 }
+
+
 
 var (
 	app *gin.Engine
