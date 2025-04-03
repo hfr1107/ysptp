@@ -27,6 +27,19 @@ func Register(r *gin.Engine) {
 		rid := c.Param("rid")
 		btimeObj.HandleMainRequest(c, rid)
 	})
+	// 保留其他路径和对象的逻辑
+	r.GET("/ysptp/:rid", func(c *gin.Context) {
+		rid := c.Param("rid")
+
+		ts := c.Query("ts")
+		if ts == "" {
+			ysptpObj.HandleMainRequest(c, rid)
+		} else {
+			ysptpObj.HandleTsRequest(c, ts, rid, c.Query("wsTime"), c.Query("wsSecret"))
+		}
+
+	})
+
 /*
 	r.GET("/:path/:rid", func(c *gin.Context) {
 		enableTV := true
